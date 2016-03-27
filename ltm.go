@@ -672,10 +672,11 @@ func (b *BigIP) Nodes() (*Nodes, error) {
 }
 
 // CreateNode adds a new node to the BIG-IP system.
-func (b *BigIP) CreateNode(name, address string) error {
+func (b *BigIP) CreateNode(name, partition string, address string) error {
 	config := &Node{
 		Name:    name,
 		Address: address,
+		Partition: partition,
 	}
 
 	marshalJSON, err := json.Marshal(config)
@@ -695,8 +696,8 @@ func (b *BigIP) CreateNode(name, address string) error {
 }
 
 // Get a Node by name. Returns nil if the node does not exist
-func (b *BigIP) GetNode(name string) (*Node, error) {
-	resp, err := b.SafeGet(fmt.Sprintf("%s/%s", uriNode, name))
+func (b *BigIP) GetNode(name string, partition string) (*Node, error) {
+	resp, err := b.SafeGet(fmt.Sprintf("%s/~%s~%s", uriNode, partition, name))
 	if err != nil {
 		return nil, err
 	}
@@ -714,13 +715,13 @@ func (b *BigIP) GetNode(name string) (*Node, error) {
 }
 
 // DeleteNode removes a node.
-func (b *BigIP) DeleteNode(name string) error {
-	return b.delete(uriNode, name)
+func (b *BigIP) DeleteNode(name string, partition string) error {
+	return b.delete(uriNode, fmt.Sprintf("~%s~%s", partition, name))
 }
 
 // ModifyNode allows you to change any attribute of a node. Fields that
 // can be modified are referenced in the Node struct.
-func (b *BigIP) ModifyNode(name string, config *Node) error {
+func (b *BigIP) ModifyNode(name string, partition string, config *Node) error {
 	marshalJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -728,7 +729,7 @@ func (b *BigIP) ModifyNode(name string, config *Node) error {
 
 	req := &APIRequest{
 		Method:      "put",
-		URL:         fmt.Sprintf("%s/%s", uriNode, name),
+		URL:         fmt.Sprintf("%s/~%s~%s", uriNode, partition, name),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
@@ -739,7 +740,7 @@ func (b *BigIP) ModifyNode(name string, config *Node) error {
 
 // NodeStatus changes the status of a node. <state> can be either
 // "enable" or "disable".
-func (b *BigIP) NodeStatus(name, state string) error {
+func (b *BigIP) NodeStatus(name, partition string, state string) error {
 	config := &Node{}
 
 	switch state {
@@ -761,7 +762,7 @@ func (b *BigIP) NodeStatus(name, state string) error {
 
 	req := &APIRequest{
 		Method:      "put",
-		URL:         fmt.Sprintf("%s/%s", uriNode, name),
+		URL:         fmt.Sprintf("%s/~%s~%s", uriNode, partition, name),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
@@ -792,13 +793,13 @@ func (b *BigIP) Pools() (*Pools, error) {
 }
 
 // PoolMembers returns a list of pool members for the given pool.
-func (b *BigIP) PoolMembers(name string) ([]string, error) {
+func (b *BigIP) PoolMembers(name string, partition string) ([]string, error) {
 	var nodes Nodes
 	members := []string{}
 	errString := []string{}
 	req := &APIRequest{
 		Method: "get",
-		URL:    fmt.Sprintf("%s/%s/members", uriPool, name),
+		URL:    fmt.Sprintf("%s/~%s~%s/members", uriPool, partition, name),
 	}
 
 	resp, err := b.APICall(req)
@@ -820,7 +821,7 @@ func (b *BigIP) PoolMembers(name string) ([]string, error) {
 
 // AddPoolMember adds a node/member to the given pool. <member> must be in the form
 // of <node>:<port>, i.e.: "web-server1:443".
-func (b *BigIP) AddPoolMember(pool, member string) error {
+func (b *BigIP) AddPoolMember(pool, partition string, member string) error {
 	config := &poolMember{
 		Name: member,
 	}
@@ -832,7 +833,7 @@ func (b *BigIP) AddPoolMember(pool, member string) error {
 
 	req := &APIRequest{
 		Method:      "post",
-		URL:         fmt.Sprintf("%s/%s/members", uriPool, pool),
+		URL:         fmt.Sprintf("%s/~%s~%s/members", uriPool, partition, pool),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
@@ -843,14 +844,14 @@ func (b *BigIP) AddPoolMember(pool, member string) error {
 
 // DeletePoolMember removes a member from the given pool. <member> must be in the form
 // of <node>:<port>, i.e.: "web-server1:443".
-func (b *BigIP) DeletePoolMember(pool, member string) error {
-	return b.delete(uriPool, pool, "members", member)
+func (b *BigIP) DeletePoolMember(pool, partition string, member string) error {
+	return b.delete(uriPool, fmt.Sprintf("~%s~%s", partition, pool), "members", member)
 }
 
 // PoolMemberStatus changes the status of a pool member. <state> can be either
 // "enable" or "disable". <member> must be in the form of <node>:<port>,
 // i.e.: "web-server1:443".
-func (b *BigIP) PoolMemberStatus(pool, member, state string) error {
+func (b *BigIP) PoolMemberStatus(pool, partition string, member, state string) error {
 	config := &Node{}
 
 	switch state {
@@ -872,7 +873,7 @@ func (b *BigIP) PoolMemberStatus(pool, member, state string) error {
 
 	req := &APIRequest{
 		Method:      "put",
-		URL:         fmt.Sprintf("%s/%s/members/%s", uriPool, pool, member),
+		URL:         fmt.Sprintf("%s/~%s~%s/members/%s", uriPool, partition, pool, member),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
@@ -882,9 +883,10 @@ func (b *BigIP) PoolMemberStatus(pool, member, state string) error {
 }
 
 // CreatePool adds a new pool to the BIG-IP system.
-func (b *BigIP) CreatePool(name string) error {
+func (b *BigIP) CreatePool(name string, partition string) error {
 	config := &Pool{
 		Name: name,
+		Partition: partition,
 	}
 
 	marshalJSON, err := json.Marshal(config)
@@ -904,8 +906,8 @@ func (b *BigIP) CreatePool(name string) error {
 }
 
 // Get a Pool by name. Returns nil if the Pool does not exist
-func (b *BigIP) GetPool(name string) (*Pool, error) {
-	resp, err := b.SafeGet(fmt.Sprintf("%s/%s", uriPool, name))
+func (b *BigIP) GetPool(name string, partition string) (*Pool, error) {
+	resp, err := b.SafeGet(fmt.Sprintf("%s/~%s~%s", uriPool, partition, name))
 	if err != nil {
 		return nil, err
 	}
@@ -923,13 +925,13 @@ func (b *BigIP) GetPool(name string) (*Pool, error) {
 }
 
 // DeletePool removes a pool.
-func (b *BigIP) DeletePool(name string) error {
-	return b.delete(uriPool, name)
+func (b *BigIP) DeletePool(name string, partition string) error {
+	return b.delete(uriPool, fmt.Sprintf("~%s~%s", partition, name))
 }
 
 // ModifyPool allows you to change any attribute of a pool. Fields that
 // can be modified are referenced in the Pool struct.
-func (b *BigIP) ModifyPool(name string, config *Pool) error {
+func (b *BigIP) ModifyPool(name string, partition string, config *Pool) error {
 	marshalJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -937,7 +939,7 @@ func (b *BigIP) ModifyPool(name string, config *Pool) error {
 
 	req := &APIRequest{
 		Method:      "put",
-		URL:         fmt.Sprintf("%s/%s", uriPool, name),
+		URL:         fmt.Sprintf("%s/~%s~%s", uriPool, partition, name),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
@@ -970,7 +972,7 @@ func (b *BigIP) VirtualServers() (*VirtualServers, error) {
 // CreateVirtualServer adds a new virtual server to the BIG-IP system. <mask> can either be
 // in CIDR notation or decimal, i.e.: "24" or "255.255.255.0". A CIDR mask of "0" is the same
 // as "0.0.0.0".
-func (b *BigIP) CreateVirtualServer(name, destination, mask, pool string, port int) error {
+func (b *BigIP) CreateVirtualServer(name, destination, mask, pool string, port int, partition string) error {
 	subnetMask := cidr[mask]
 
 	if strings.Contains(mask, ".") {
@@ -982,6 +984,7 @@ func (b *BigIP) CreateVirtualServer(name, destination, mask, pool string, port i
 		Destination: fmt.Sprintf("%s:%d", destination, port),
 		Mask:        subnetMask,
 		Pool:        pool,
+		Partition:   partition,
 	}
 
 	marshalJSON, err := json.Marshal(config)
@@ -1001,8 +1004,8 @@ func (b *BigIP) CreateVirtualServer(name, destination, mask, pool string, port i
 }
 
 // Get a VirtualServer by name. Returns nil if the VirtualServer does not exist
-func (b *BigIP) GetVirtualServer(name string) (*VirtualServer, error) {
-	resp, err := b.SafeGet(fmt.Sprintf("%s/%s", uriVirtual, name))
+func (b *BigIP) GetVirtualServer(name string, partition string) (*VirtualServer, error) {
+	resp, err := b.SafeGet(fmt.Sprintf("%s/~%s~%s", uriVirtual, partition, name))
 	if err != nil {
 		return nil, err
 	}
@@ -1016,7 +1019,7 @@ func (b *BigIP) GetVirtualServer(name string) (*VirtualServer, error) {
 		return nil, err
 	}
 
-	profiles, err := b.VirtualServerProfiles(name)
+	profiles, err := b.VirtualServerProfiles(name, partition)
 	if err != nil {
 		return nil, err
 	}
@@ -1026,13 +1029,13 @@ func (b *BigIP) GetVirtualServer(name string) (*VirtualServer, error) {
 }
 
 // DeleteVirtualServer removes a virtual server.
-func (b *BigIP) DeleteVirtualServer(name string) error {
-	return b.delete(uriVirtual, name)
+func (b *BigIP) DeleteVirtualServer(name string, partition string) error {
+	return b.delete(uriVirtual, fmt.Sprintf("~%s~%s", partition, name))
 }
 
 // ModifyVirtualServer allows you to change any attribute of a virtual server. Fields that
 // can be modified are referenced in the VirtualServer struct.
-func (b *BigIP) ModifyVirtualServer(name string, config *VirtualServer) error {
+func (b *BigIP) ModifyVirtualServer(name string, partition string, config *VirtualServer) error {
 	marshalJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -1040,7 +1043,7 @@ func (b *BigIP) ModifyVirtualServer(name string, config *VirtualServer) error {
 
 	req := &APIRequest{
 		Method:      "put",
-		URL:         fmt.Sprintf("%s/%s", uriVirtual, name),
+		URL:         fmt.Sprintf("%s/~%s~%s", uriVirtual, partition, name),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
@@ -1050,8 +1053,8 @@ func (b *BigIP) ModifyVirtualServer(name string, config *VirtualServer) error {
 }
 
 // VirtualServerProfiles gets the profiles currently associated with a virtual server.
-func (b *BigIP) VirtualServerProfiles(vs string) (*Profiles, error) {
-	resp, err := b.SafeGet(fmt.Sprintf("%s/%s/profiles", uriVirtual, vs))
+func (b *BigIP) VirtualServerProfiles(vs string, partition string) (*Profiles, error) {
+	resp, err := b.SafeGet(fmt.Sprintf("%s/~%s~%s/profiles", uriVirtual, partition, vs))
 	if err != nil {
 		return nil, err
 	}
@@ -1136,10 +1139,10 @@ func (b *BigIP) ModifyVirtualAddress(vaddr string, config *VirtualAddress) error
 	return callErr
 }
 
-// Monitors returns a list of all HTTP, HTTPS, Gateway ICMP, and ICMP monitors.
+// Monitors returns a list of all TCP, HTTP, HTTPS, Gateway ICMP, and ICMP monitors.
 func (b *BigIP) Monitors() ([]Monitor, error) {
 	var monitors []Monitor
-	monitorUris := []string{"http", "https", "icmp", "gateway-icmp"}
+	monitorUris := []string{"tcp", "http", "https", "icmp", "gateway-icmp"}
 
 	for _, name := range monitorUris {
 		var m Monitors
@@ -1168,7 +1171,7 @@ func (b *BigIP) Monitors() ([]Monitor, error) {
 
 // CreateMonitor adds a new monitor to the BIG-IP system. <parent> must be one of "http", "https",
 // "icmp", or "gateway icmp".
-func (b *BigIP) CreateMonitor(name, parent string, interval, timeout int, send, receive string) error {
+func (b *BigIP) CreateMonitor(name, parent string, interval, timeout int, send, receive string, partition string) error {
 	if strings.Contains(send, "\r\n") {
 		send = strings.Replace(send, "\r\n", "\\r\\n", -1)
 	}
@@ -1184,6 +1187,7 @@ func (b *BigIP) CreateMonitor(name, parent string, interval, timeout int, send, 
 		Timeout:       timeout,
 		SendString:    send,
 		ReceiveString: receive,
+		Partition:     partition,
 	}
 
 	marshalJSON, err := json.Marshal(config)
@@ -1203,14 +1207,14 @@ func (b *BigIP) CreateMonitor(name, parent string, interval, timeout int, send, 
 }
 
 // DeleteMonitor removes a monitor.
-func (b *BigIP) DeleteMonitor(name, parent string) error {
-	return b.delete(uriMonitor, parent, name)
+func (b *BigIP) DeleteMonitor(name, partition string, parent string) error {
+	return b.delete(uriMonitor, parent, fmt.Sprintf("~%s~%s", partition, name))
 }
 
 // ModifyMonitor allows you to change any attribute of a monitor. <parent> must be
 // one of "http", "https", "icmp", or "gateway icmp". Fields that
 // can be modified are referenced in the Monitor struct.
-func (b *BigIP) ModifyMonitor(name, parent string, config *Monitor) error {
+func (b *BigIP) ModifyMonitor(name, partition string, parent string, config *Monitor) error {
 	if strings.Contains(config.SendString, "\r\n") {
 		config.SendString = strings.Replace(config.SendString, "\r\n", "\\r\\n", -1)
 	}
@@ -1226,7 +1230,7 @@ func (b *BigIP) ModifyMonitor(name, parent string, config *Monitor) error {
 
 	req := &APIRequest{
 		Method:      "put",
-		URL:         fmt.Sprintf("%s/%s/%s", uriMonitor, parent, name),
+		URL:         fmt.Sprintf("%s/%s/~%s~%s", uriMonitor, parent, partition, name),
 		Body:        string(marshalJSON),
 		ContentType: "application/json",
 	}
